@@ -29,9 +29,9 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
-def create_access_token(username: str) -> str:
+def create_access_token(nomuser: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode({"sub": username, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode({"sub": nomuser, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def get_current_user(
@@ -45,13 +45,13 @@ def get_current_user(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        if not username:
+        nomuser = payload.get("sub")
+        if not nomuser:
             raise credentials_error
     except jwt.PyJWTError:
         raise credentials_error
 
-    user = db.scalar(select(models.Usuario).where(models.Usuario.username == username))
+    user = db.scalar(select(models.Usuario).where(models.Usuario.nomuser == nomuser))
     if user is None:
         raise credentials_error
     return user
@@ -60,12 +60,14 @@ def get_current_user(
 @router.post("/registro", response_model=schemas.UsuarioOut, status_code=201)
 def registro(datos: schemas.UsuarioCreate, db: Session = Depends(get_db)):
     existe = db.scalar(
-        select(models.Usuario).where(models.Usuario.username == datos.username)
+        select(models.Usuario).where(models.Usuario.nomuser == datos.nomuser)
     )
     if existe:
         raise HTTPException(status_code=409, detail="El usuario ya existe")
     user = models.Usuario(
-        username=datos.username, hashed_password=hash_password(datos.password)
+        nomuser=datos.nomuser,
+        passwd=hash_password(datos.passwd),
+        nombrecompleto=datos.nombrecompleto,
     )
     db.add(user)
     db.commit()
@@ -78,12 +80,12 @@ def login(
     form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
 ):
     user = db.scalar(
-        select(models.Usuario).where(models.Usuario.username == form.username)
+        select(models.Usuario).where(models.Usuario.nomuser == form.username)
     )
-    if not user or not verify_password(form.password, user.hashed_password):
+    if not user or not verify_password(form.password, user.passwd):
         raise HTTPException(
             status_code=401,
             detail="Usuario o contraseña incorrectos",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return schemas.Token(access_token=create_access_token(user.username))
+    return schemas.Token(access_token=create_access_token(user.nomuser))
