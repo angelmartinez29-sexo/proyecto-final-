@@ -1,7 +1,8 @@
 """Punto de entrada de la API de Librería Chiapas."""
+
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from . import auth, models  # noqa: F401  (models registra las tablas en Base)
 from .database import Base, engine
@@ -22,9 +23,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Endpoints públicos de autenticación (/auth/login y /auth/registro)
 app.include_router(auth.router)
-app.include_router(libros.router)
-app.include_router(editoriales.router)
+
+# Todos los endpoints de libros y editoriales exigen Bearer Token válido
+app.include_router(
+    libros.router,
+    dependencies=[Depends(auth.get_current_user)],
+)
+app.include_router(
+    editoriales.router,
+    dependencies=[Depends(auth.get_current_user)],
+)
 
 
 @app.get("/", tags=["Inicio"])
