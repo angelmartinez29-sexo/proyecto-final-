@@ -1,14 +1,12 @@
 """Esquemas Pydantic: validación de entrada y serialización de salida."""
-from decimal import Decimal
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
 # ---------- Editoriales ----------
 class EditorialBase(BaseModel):
-    nombre: str = Field(..., min_length=1, max_length=100)
-    pais: str | None = Field(None, max_length=60)
-    sitio_web: str | None = Field(None, max_length=200)
+    nombre: str = Field(..., min_length=1, max_length=150)
+    pais: str = Field(..., min_length=1, max_length=100)
+    email: str = Field(..., min_length=1, max_length=150)
 
 
 class EditorialCreate(EditorialBase):
@@ -22,12 +20,11 @@ class EditorialOut(EditorialBase):
 
 # ---------- Libros ----------
 class LibroBase(BaseModel):
-    titulo: str = Field(..., min_length=1, max_length=150)
-    autor: str = Field(..., min_length=1, max_length=100)
-    isbn: str = Field(..., min_length=10, max_length=17, description="ISBN-10 o ISBN-13")
-    anio_publicacion: int = Field(..., gt=1000, lt=2100)
-    precio: Decimal = Field(..., gt=0, max_digits=10, decimal_places=2)
-    stock: int = Field(0, ge=0)
+    titulo: str = Field(..., min_length=1, max_length=200)
+    autor: str = Field(..., min_length=1, max_length=150)
+    isbn: str = Field(..., min_length=1, max_length=30, description="ISBN del libro")
+    anio: int = Field(..., gt=1000, lt=2100)
+    existencia: int = Field(0, ge=0)
     editorial_id: int = Field(..., gt=0)
 
 
@@ -47,14 +44,16 @@ class LibroDetalle(LibroOut):
 
 # ---------- Autenticación ----------
 class UsuarioCreate(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
-    password: str = Field(..., min_length=6, max_length=72)
+    nomuser: str = Field(..., min_length=3, max_length=80)
+    passwd: str = Field(..., min_length=6, max_length=72)
+    nombrecompleto: str = Field(..., min_length=1, max_length=150)
 
 
 class UsuarioOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    username: str
+    nomuser: str
+    nombrecompleto: str
 
 
 class Token(BaseModel):
