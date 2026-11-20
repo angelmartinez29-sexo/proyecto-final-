@@ -1,27 +1,51 @@
 """Configuración de la conexión a PostgreSQL con SQLAlchemy."""
 
 import os
+from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
+# Fuerza UTF-8 en libpq/psycopg2 en Windows antes de cargar el driver
+os.environ.setdefault("PGCLIENTENCODING", "UTF8")
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-load_dotenv()
+# Busca .env en la carpeta del proyecto (o padre si está anidada)
+BASE_DIR = Path(__file__).resolve().parent.parent
+for candidate in (BASE_DIR / ".env", BASE_DIR.parent / ".env"):
+    if candidate.exists():
+        load_dotenv(dotenv_path=candidate, encoding="utf-8")
+        break
+else:
+    load_dotenv(encoding="utf-8")
 
 DEFAULT_DATABASE_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/libreria"
 
 
 def _normalize_database_url(raw_url: str) -> str:
-    """Asegura que las URLs de PostgreSQL usen el dialecto explícito de psycopg2."""
-    url = raw_url.strip()
+    """Normaliza la URL de PostgreSQL para psycopg2 y asegura SSL en hosts remotos."""
+    url = raw_url.strip().strip('"').strip("'")
+
     if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg2://", 1)
-    if (
+        url = url.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif (
         url.startswith("postgresql://")
         and "+psycopg2" not in url
         and "+psycopg" not in url
     ):
-        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+
+    # Si es un host remoto (como Render) y no especifica sslmode, agrega sslmode=require
+    if host and host not in {"localhost", "127.0.0.1", "::1"}:
+        query_params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query_params.setdefault("sslmode", "require")
+        new_query = urlencode(query_params)
+        url = urlunparse(parsed._replace(query=new_query))
+
     return url
 
 
